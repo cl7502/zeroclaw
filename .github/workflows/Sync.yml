@@ -1,0 +1,40 @@
+name: Auto Merge Upstream
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Your Fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # 使用你刚才创建的 PAT，它天然拥有修改 workflow 的权利
+          token: ${{ secrets.SYNC_PAT }}
+
+      - name: Config Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch and Merge Upstream
+        run: |
+          # 1. 添加真正的源仓库
+          git remote add upstream https://github.com/zeroclaw-labs/zeroclaw.git
+          git fetch upstream
+
+          # 2. 切换并合并
+          git checkout main
+          echo "Starting merge..."
+          # 合并上游 main 到你的 main
+          git merge upstream/main --no-edit || {
+            echo "Conflict detected! You must resolve it manually."
+            exit 1
+          }
+
+          # 3. 推送结果
+          git push origin main
