@@ -1,40 +1,46 @@
-name: Auto Merge Upstream
+name: Auto Merge & Sync Tags
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
+    - cron: "0 */6 * * *" # 每6小时运行一次
+  workflow_dispatch:      # 允许手动触发测试
 
 jobs:
-  merge:
+  merge-and-tags:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Your Fork
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          # 使用你刚才创建的 PAT，它天然拥有修改 workflow 的权利
-          token: ${{ secrets.SYNC_PAT }}
+          fetch-depth: 0 # 必须为0，获取完整历史以支持合并和标签抓取
+          token: ${{ secrets.SYNC_PAT }} # 使用你创建的 PAT
 
       - name: Config Git User
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Fetch and Merge Upstream
+      - name: Merge Upstream Code
         run: |
-          # 1. 添加真正的源仓库
+          # 1. 添加并拉取源仓库
           git remote add upstream https://github.com/zeroclaw-labs/zeroclaw.git
-          git fetch upstream
+          git fetch upstream --tags # 同时拉取代码和标签
 
-          # 2. 切换并合并
+          # 2. 合并主分支代码 (假设是 main)
           git checkout main
-          echo "Starting merge..."
-          # 合并上游 main 到你的 main
+          echo "Merging upstream/main..."
+          # 使用 --no-edit 自动完成合并提交
           git merge upstream/main --no-edit || {
-            echo "Conflict detected! You must resolve it manually."
+            echo "Conflict detected! Please resolve manually."
             exit 1
           }
 
-          # 3. 推送结果
+          # 3. 推送合并后的代码到你的 Fork
           git push origin main
+
+      - name: Sync All Tags
+        run: |
+          # 4. 将源仓库的所有标签推送到你的 Fork
+          # --tags 会推送本地存在但远程没有的所有标签
+          echo "Syncing tags..."
+          git push origin --tags
